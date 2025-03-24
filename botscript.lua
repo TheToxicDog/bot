@@ -180,13 +180,14 @@ end
 local function jumpCommand()
     local character = botPlayer.Character
     if character then
-        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        local humanoid = character:FindFirstChildWhichIsA("Humanoid")
         if humanoid then
             humanoid.Sit = false
-            humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+            humanoid:ChangeState(Enum.HumanoidStateType.Jumping)  -- Make the character jump
         end
     end
 end
+
 
 -- Command listener
 for _, player in ipairs(Players:GetPlayers()) do
