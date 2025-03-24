@@ -183,7 +183,9 @@ local function jumpCommand()
         local humanoid = character:FindFirstChildWhichIsA("Humanoid")
         if humanoid then
             humanoid.Sit = false
-            humanoid:ChangeState(Enum.HumanoidStateType.Jumping)  -- Make the character jump
+            humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            wait()
+            humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
         end
     end
 end
