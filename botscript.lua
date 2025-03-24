@@ -3,6 +3,7 @@ local botPlayer = game.Players.LocalPlayer
 local Players = game:GetService("Players")
 local Owner = game.Players:GetPlayerByUserId(userId)
 local TeleportService = game:GetService("TeleportService")
+
 local whitelist = {}  -- Table to store whitelisted players
 
 -- Function to find a player that matches the input name (with autofill)
@@ -73,7 +74,7 @@ local function safeCommand()
     local character = botPlayer.Character
     if not character then return end
     
-    -- Create a part in the sky
+    -- Create a part in the sky (1 million studs high)
     local safePart = Instance.new("Part")
     safePart.Size = Vector3.new(10, 10, 10)  -- You can adjust the size of the safe part
     safePart.Position = Vector3.new(0, 1000000, 0)  -- Position it 1 million studs in the sky
@@ -81,7 +82,7 @@ local function safeCommand()
     safePart.CanCollide = false
     safePart.Parent = workspace
 
-    -- Move the client to the part
+    -- Move the client to the part, placing the bot on top of the part
     character:SetPrimaryPartCFrame(CFrame.new(safePart.Position + Vector3.new(0, 5, 0)))  -- Position the player slightly above the part
 
     -- Remove velocity from the client
@@ -94,107 +95,105 @@ local function safeCommand()
     print("Player is now safe and in the sky!")
 end
 
--- Add a player to the whitelist
-local function whitelistPlayer(player)
-    if not whitelist[player.UserId] then
-        whitelist[player.UserId] = player
-        print(player.Name .. " has been whitelisted.")
-    else
-        print(player.Name .. " is already whitelisted.")
-    end
-end
-
--- Remove a player from the whitelist
-local function unwhitelistPlayer(player)
-    if whitelist[player.UserId] then
-        whitelist[player.UserId] = nil
-        print(player.Name .. " has been unwhitelisted.")
-    else
-        print(player.Name .. " is not in the whitelist.")
-    end
-end
-
--- Handle command input from a whispered message
-local function onWhisper(message, player)
-    if not message then return end  -- Early return if no message
-    
-    -- Ensure the message is a string and check the prefix
-    if type(message) == "string" and message:sub(1, 1) == "." then
-        local parts = message:sub(2):split(" ")
-        local command = parts[1]
-
-        -- Only process commands from whitelisted players
-        if whitelist[player.UserId] or player == Owner then
-            if command == "come" then
-                -- Teleport bot to the owner
-                botPlayer.Character:SetPrimaryPartCFrame(player.Character.PrimaryPart.CFrame)
-            elseif command == "reset" then
-                -- Reset the bot player's character
-                if botPlayer.Character then
-                    botPlayer.Character:BreakJoints()
-                end
-            elseif command == "to" or command == "tp" then
-                -- Teleport bot to another player
-                local targetPlayerName = parts[2]
-                local targetPlayer = findPlayerByName(targetPlayerName)
-                if targetPlayer then
-                    botPlayer.Character:SetPrimaryPartCFrame(targetPlayer.Character.PrimaryPart.CFrame)
-                else
-                    print("Player not found: " .. targetPlayerName)
-                end
-            elseif command == "fling" then
-                -- Fling the player to the target player
-                local targetPlayerName = parts[2]
-                local targetPlayer = findPlayerByName(targetPlayerName)
-                if targetPlayer then
-                    flingPlayer(targetPlayer)
-                else
-                    print("Player not found: " .. targetPlayerName)
-                end
-            elseif command == "leave" or command == "dc" then
-                -- Disconnect the bot from the game
-                botPlayer:Kick("Disconnected by command.")  -- Optional message can be added
-            elseif command == "rj" or command == "rejoin" then
-                -- Rejoin the game
-                local placeId = game.PlaceId
-                local teleportData = {}  -- Optional, can be used to send data on rejoin
-                TeleportService:Teleport(placeId, botPlayer, teleportData)
-            elseif command == "safe" then
-                -- Call the safe command
-                safeCommand()
-            elseif command == "whitelist" or command == "wl" then
-                -- Add player to whitelist
-                local targetPlayerName = parts[2]
-                local targetPlayer = findPlayerByName(targetPlayerName)
-                if targetPlayer then
-                    whitelistPlayer(targetPlayer)
-                else
-                    print("Player not found: " .. targetPlayerName)
-                end
-            elseif command == "unwhitelist" or command == "uwl" then
-                -- Remove player from whitelist
-                local targetPlayerName = parts[2]
-                local targetPlayer = findPlayerByName(targetPlayerName)
-                if targetPlayer then
-                    unwhitelistPlayer(targetPlayer)
-                else
-                    print("Player not found: " .. targetPlayerName)
-                end
-            end
-        else
-            print("You are not whitelisted to use the bot commands.")
-        end
-    end
-end
-
--- Listen for whispers
-Players.PlayerChatted:Connect(function(player, message)
-    if player == botPlayer then
-        -- Ignore the bot itself
+-- Whitelist command implementation
+local function whitelistCommand(playerName)
+    if playerName:lower() == Owner.Name:lower() then
+        print("You cannot whitelist the owner!")
         return
     end
-    onWhisper(message, player)
-end)
 
--- Example setup for whitelisting/unwhitelisting a player directly
-whitelistPlayer(Owner)  -- The bot owner is automatically whitelisted.
+    local player = findPlayerByName(playerName)
+    if player then
+        whitelist[player.UserId] = player
+        print(player.Name .. " has been added to the whitelist.")
+    else
+        print("Player not found.")
+    end
+end
+
+-- Unwhitelist command implementation
+local function unwhitelistCommand(playerName)
+    if playerName:lower() == Owner.Name:lower() then
+        -- If someone tries to unwhitelist the owner, they get unwhitelisted instead
+        if whitelist[botPlayer.UserId] then
+            whitelist[botPlayer.UserId] = nil
+            print("You have been unwhitelisted for trying to unwhitelist the owner.")
+        end
+        return
+    end
+
+    local player = findPlayerByName(playerName)
+    if player then
+        whitelist[player.UserId] = nil
+        print(player.Name .. " has been removed from the whitelist.")
+    else
+        print("Player not found.")
+    end
+end
+
+-- Command listener
+for _, player in ipairs(Players:GetPlayers()) do
+    player.Chatted:Connect(function(message)
+        if message:sub(1, 1) == "." then
+            local parts = message:sub(2):split(" ")
+            local command = parts[1]
+
+            if player == Owner or whitelist[player.UserId] then
+                if command == "come" then
+                    -- Teleport bot to the owner
+                    botPlayer.Character:SetPrimaryPartCFrame(player.Character.PrimaryPart.CFrame)
+                elseif command == "reset" then
+                    -- Reset the bot player's character
+                    if botPlayer.Character then
+                        botPlayer.Character:BreakJoints()
+                    end
+                elseif command == "to" or command == "tp" then
+                    -- Teleport bot to another player
+                    local targetPlayerName = parts[2]
+                    local targetPlayer = findPlayerByName(targetPlayerName)
+                    if targetPlayer then
+                        botPlayer.Character:SetPrimaryPartCFrame(targetPlayer.Character.PrimaryPart.CFrame)
+                    else
+                        print("Player not found: " .. targetPlayerName)
+                    end
+                elseif command == "fling" then
+                    -- Fling the player to the target player
+                    local targetPlayerName = parts[2]
+                    local targetPlayer = findPlayerByName(targetPlayerName)
+                    if targetPlayer then
+                        flingPlayer(targetPlayer)
+                    else
+                        print("Player not found: " .. targetPlayerName)
+                    end
+                elseif command == "leave" or command == "dc" then
+                    -- Disconnect the bot from the game
+                    botPlayer:Kick("Disconnected by command.")  -- Optional message can be added
+                elseif command == "rj" or command == "rejoin" then
+                    -- Rejoin the game
+                    local placeId = game.PlaceId
+                    local teleportData = {}  -- Optional, can be used to send data on rejoin
+                    TeleportService:Teleport(placeId, botPlayer, teleportData)
+                elseif command == "safe" then
+                    -- Call the safe command
+                    safeCommand()
+                elseif command == "whitelist" or command == "wl" then
+                    -- Whitelist a player
+                    whitelistCommand(parts[2])
+                elseif command == "unwhitelist" or command == "uwl" then
+                    -- Unwhitelist a player
+                    unwhitelistCommand(parts[2])
+                end
+            else
+                print("You are not authorized to use this bot.")
+            end
+        end
+    end)
+end
+
+if Owner then
+    print("Welcome, " .. Owner.Name)
+    return Owner
+else
+    print("User not found, retrying!")
+    return nil
+end
