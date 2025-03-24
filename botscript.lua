@@ -15,6 +15,7 @@ end
 
 -- Command handling function
 local function processCommand(sender, message)
+    if not sender or not sender.UserId then return end -- Ensure sender is valid
     if not Whitelist[sender.UserId] then return end -- Ignore non-whitelisted users
     if not message:sub(1, 1) == "." then return end -- Only process messages starting with '.'
 
@@ -90,7 +91,16 @@ local function processCommand(sender, message)
     end
 end
 
--- Listen for chat messages
-Players.PlayerChatted:Connect(function(sender, message)
-    processCommand(sender, message)
+-- Listen for chat messages from all players
+for _, player in ipairs(Players:GetPlayers()) do
+    player.Chatted:Connect(function(message)
+        processCommand(player, message)
+    end)
+end
+
+-- Ensure new players are also listened to
+Players.PlayerAdded:Connect(function(player)
+    player.Chatted:Connect(function(message)
+        processCommand(player, message)
+    end)
 end)
