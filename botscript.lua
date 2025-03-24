@@ -116,10 +116,13 @@ end
 
 -- Handle command input from a whispered message
 local function onWhisper(message, player)
-    if message:sub(1, 1) == "." then
+    if not message then return end  -- Early return if no message
+    
+    -- Ensure the message is a string and check the prefix
+    if type(message) == "string" and message:sub(1, 1) == "." then
         local parts = message:sub(2):split(" ")
         local command = parts[1]
-        
+
         -- Only process commands from whitelisted players
         if whitelist[player.UserId] or player == Owner then
             if command == "come" then
