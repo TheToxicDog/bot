@@ -131,6 +131,58 @@ local function unwhitelistCommand(playerName)
     end
 end
 
+-- WalkTo command implementation
+local function walkToPlayer(targetPlayer)
+    local character = botPlayer.Character
+    if character and targetPlayer.Character then
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        local targetPosition = targetPlayer.Character.HumanoidRootPart.Position
+
+        if humanoid then
+            humanoid:MoveTo(targetPosition)
+        end
+    end
+end
+
+-- TweenTo command implementation
+local function tweenToPlayer(targetPlayer)
+    local character = botPlayer.Character
+    if not character then return end
+    
+    local tweenService = game:GetService("TweenService")
+    local goal = {Position = targetPlayer.Character.HumanoidRootPart.Position}
+    local tweenInfo = TweenInfo.new(2, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut)
+
+    local tween = tweenService:Create(character, tweenInfo, goal)
+    tween:Play()
+end
+
+-- Spin command implementation
+local function spinCommand()
+    local character = botPlayer.Character
+    if not character then return end
+
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    if humanoidRootPart then
+        local spin = Instance.new("BodyGyro", humanoidRootPart)
+        spin.MaxTorque = Vector3.new(400000, 400000, 400000)
+        spin.CFrame = humanoidRootPart.CFrame
+        spin.D = 5000
+        
+        -- Spin continuously
+        while true do
+            humanoidRootPart.CFrame = humanoidRootPart.CFrame * CFrame.Angles(0, math.rad(10), 0)  -- Spin around Y axis
+            game:GetService("RunService").Heartbeat:Wait()
+        end
+    end
+end
+
+-- Say command implementation
+local function sayCommand(message)
+    local chatEvents = game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest
+    chatEvents:FireServer(message, "All")
+end
+
 -- Command listener
 for _, player in ipairs(Players:GetPlayers()) do
     player.Chatted:Connect(function(message)
@@ -182,6 +234,31 @@ for _, player in ipairs(Players:GetPlayers()) do
                 elseif command == "unwhitelist" or command == "uwl" then
                     -- Unwhitelist a player
                     unwhitelistCommand(parts[2])
+                elseif command == "walkto" then
+                    -- Walk to a player
+                    local targetPlayerName = parts[2]
+                    local targetPlayer = findPlayerByName(targetPlayerName)
+                    if targetPlayer then
+                        walkToPlayer(targetPlayer)
+                    else
+                        print("Player not found: " .. targetPlayerName)
+                    end
+                elseif command == "tweento" then
+                    -- Tween to a player
+                    local targetPlayerName = parts[2]
+                    local targetPlayer = findPlayerByName(targetPlayerName)
+                    if targetPlayer then
+                        tweenToPlayer(targetPlayer)
+                    else
+                        print("Player not found: " .. targetPlayerName)
+                    end
+                elseif command == "spin" then
+                    -- Spin the player
+                    spinCommand()
+                elseif command == "say" then
+                    -- Send a message using Say
+                    local message = table.concat(parts, " ", 2)
+                    sayCommand(message)
                 end
             else
                 print("You are not authorized to use this bot.")
