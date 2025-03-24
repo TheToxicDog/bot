@@ -2,7 +2,8 @@ local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local userID = 174142107  -- Allowed user ID
 local Whitelist = {[userID] = true}  -- Stores whitelisted users
-print("bot script loaded.")
+local RecognitionService = game:GetService("RecognitionService") -- Hypothetical service for voice recognition
+
 -- Helper function to get a player by name
 local function getPlayer(name)
     for _, player in ipairs(Players:GetPlayers()) do
@@ -17,10 +18,9 @@ end
 local function processCommand(sender, message)
     if not sender or not sender.UserId then return end -- Ensure sender is valid
     if not Whitelist[sender.UserId] then return end -- Ignore non-whitelisted users
-    if not message:sub(1, 1) == "." then return end -- Only process messages starting with '.'
-
-    local args = message:sub(2):split(" ")
-    local command = args[1]:lower()
+    
+    local args = message:lower():split(" ")
+    local command = args[1]
 
     if command == "kill" then
         if LocalPlayer.Character then
@@ -91,16 +91,10 @@ local function processCommand(sender, message)
     end
 end
 
--- Listen for chat messages from all players
-for _, player in ipairs(Players:GetPlayers()) do
-    player.Chatted:Connect(function(message)
-        processCommand(player, message)
-    end)
+-- Function to handle recognized voice commands
+local function onVoiceCommandRecognized(player, message)
+    processCommand(player, message)
 end
 
--- Ensure new players are also listened to
-Players.PlayerAdded:Connect(function(player)
-    player.Chatted:Connect(function(message)
-        processCommand(player, message)
-    end)
-end)
+-- Connect voice recognition to command processing
+RecognitionService.VoiceCommandRecognized:Connect(onVoiceCommandRecognized)
