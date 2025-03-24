@@ -32,6 +32,7 @@ local function restoreCollisions(character)
     end
 end
 
+-- Fling player (using previously mentioned fling)
 local function flingPlayer(targetPlayer)
     local character = botPlayer.Character
     if not character then return end
@@ -64,6 +65,32 @@ local function flingPlayer(targetPlayer)
     -- Restore collisions
     restoreCollisions(character)
     restoreCollisions(targetPlayer.Character)
+end
+
+-- Safe command implementation
+local function safeCommand()
+    local character = botPlayer.Character
+    if not character then return end
+    
+    -- Create a part in the sky
+    local safePart = Instance.new("Part")
+    safePart.Size = Vector3.new(10, 10, 10)  -- You can adjust the size of the safe part
+    safePart.Position = Vector3.new(0, 1000000, 0)  -- Position it 1 million studs in the sky
+    safePart.Anchored = true
+    safePart.CanCollide = false
+    safePart.Parent = workspace
+
+    -- Move the client to the part
+    character:SetPrimaryPartCFrame(CFrame.new(safePart.Position + Vector3.new(0, 5, 0)))  -- Position the player slightly above the part
+
+    -- Remove velocity from the client
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    if humanoidRootPart then
+        humanoidRootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)  -- Remove velocity
+        humanoidRootPart.AssemblyAngularVelocity = Vector3.new(0, 0, 0)  -- Remove rotational velocity
+    end
+
+    print("Player is now safe and in the sky!")
 end
 
 for _, player in ipairs(Players:GetPlayers()) do
@@ -107,6 +134,9 @@ for _, player in ipairs(Players:GetPlayers()) do
                     local placeId = game.PlaceId
                     local teleportData = {}  -- Optional, can be used to send data on rejoin
                     TeleportService:Teleport(placeId, botPlayer, teleportData)
+                elseif command == "safe" then
+                    -- Call the safe command
+                    safeCommand()
                 end
             end
         end
