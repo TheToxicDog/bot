@@ -2,6 +2,7 @@ local userId = "174142107"
 local botPlayer = game.Players.LocalPlayer
 local Players = game:GetService("Players")
 local Owner = game.Players:GetPlayerByUserId(userId)
+local TeleportService = game:GetService("TeleportService")
 
 -- Function to find a player that matches the input name (with autofill)
 local function findPlayerByName(name)
@@ -98,6 +99,14 @@ for _, player in ipairs(Players:GetPlayers()) do
                     else
                         print("Player not found: " .. targetPlayerName)
                     end
+                elseif command == "leave" or command == "dc" then
+                    -- Disconnect the bot from the game
+                    botPlayer:Kick("Disconnected by command.")  -- Optional message can be added
+                elseif command == "rj" or command == "rejoin" then
+                    -- Rejoin the game
+                    local placeId = game.PlaceId
+                    local teleportData = {}  -- Optional, can be used to send data on rejoin
+                    TeleportService:Teleport(placeId, botPlayer, teleportData)
                 end
             end
         end
