@@ -1,273 +1,175 @@
-local userId = "174142107"
-local botPlayer = game.Players.LocalPlayer
+-- Main script with all commands, including game-specific ones
+
 local Players = game:GetService("Players")
-local Owner = game.Players:GetPlayerByUserId(userId)
-local TeleportService = game:GetService("TeleportService")
+local UserInputService = game:GetService("UserInputService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local RunService = game:GetService("RunService")
 local VoiceChatService = game:GetService("VoiceChatService")
-local whitelist = {}  -- Table to store whitelisted players
 
--- Function to find a player that matches the input name (with autofill)
-local function findPlayerByName(name)
+local botPlayer = game.Players.LocalPlayer
+local currentGameId = game.PlaceId
+
+local Owner = game.Players:GetPlayerByUserId(174142107)
+local whitelist = {}
+local commands = {}
+
+-- Function to simulate key press
+local function pressKey(key)
+    VirtualInputManager:SendKeyEvent(true, key, false, game)
+    task.wait(0.05)
+    VirtualInputManager:SendKeyEvent(false, key, false, game)
+end
+
+-- Function to set power and set the ball
+local function setPowerCommand(args)
+    local power = tonumber(args[2]) -- Extract power from argument
+    if not power or power < 1 then
+        print("Invalid power value.")
+        return
+    end
+
+    -- Reset power to 1
+    pressKey("Z")
+
+    -- Increase power (press 'E' (power - 1) times)
+    for i = 1, power - 1 do
+        pressKey("E")
+        task.wait(0.1)
+    end
+
+    -- Spawn the ball
+    pressKey("G")
+
+    -- Wait for 1.75 seconds
+    task.wait(1.75)
+
+    -- Set the ball
+    pressKey("F")
+
+    print("Set executed with power:", power)
+end
+
+-- Load game-specific commands
+if currentGameId == 3840352284 then
+    commands["set"] = setPowerCommand
+end
+
+-- Teleport command
+commands["to"] = function(args)
+    local targetName = args[2]:lower()
     for _, player in ipairs(Players:GetPlayers()) do
-        if player.Name:lower():sub(1, #name) == name:lower() then
-            return player
+        if player.Name:lower():sub(1, #targetName) == targetName then
+            botPlayer.Character.HumanoidRootPart.CFrame = player.Character.HumanoidRootPart.CFrame
+            return
         end
     end
-    return nil
+    print("Player not found")
+end
+commands["tp"] = commands["to"] -- Alias
+
+-- Reset command
+commands["reset"] = function()
+    botPlayer.Character:BreakJoints()
 end
 
--- Function to disable collision on all parts of a character
-local function disableCollisions(character)
-    for _, part in ipairs(character:GetChildren()) do
-        if part:IsA("BasePart") then
-            part.CanCollide = false
+-- Fling command
+commands["fling"] = function(args)
+    local targetName = args[2]:lower()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player.Name:lower():sub(1, #targetName) == targetName then
+            for _, part in ipairs(botPlayer.Character:GetChildren()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+            local thrust = Instance.new("BodyThrust", botPlayer.Character.HumanoidRootPart)
+            thrust.Force = Vector3.new(9999,9999,9999)
+            thrust.Name = "YeetForce"
+            repeat
+                botPlayer.Character.HumanoidRootPart.CFrame = player.Character.HumanoidRootPart.CFrame
+                thrust.Location = player.Character.HumanoidRootPart.Position
+                RunService.Heartbeat:Wait()
+            until not player.Character:FindFirstChild("Head")
         end
     end
 end
 
--- Function to restore collision on all parts of a character
-local function restoreCollisions(character)
-    for _, part in ipairs(character:GetChildren()) do
-        if part:IsA("BasePart") then
-            part.CanCollide = true
-        end
-    end
+-- Leave command
+commands["leave"] = function()
+    botPlayer:Kick("Disconnected")
 end
+commands["dc"] = commands["leave"] -- Alias
 
--- Fling player (using previously mentioned fling)
-local function flingPlayer(targetPlayer)
-    local character = botPlayer.Character
-    if not character then return end
-    
-    -- Disable collisions for the bot and target player
-    disableCollisions(character)
-    disableCollisions(targetPlayer.Character)
-    
-    -- Create BodyThrust to fling the bot
-    local thrust = Instance.new("BodyThrust", character.HumanoidRootPart)
-    thrust.Force = Vector3.new(9999, 9999, 9999)  -- Very high force to fling the bot
-    thrust.Name = "YeetForce"
-    
-    -- Keep the bot near the target player and apply the thrust force
-    local startTime = tick()
-    repeat
-        character.HumanoidRootPart.CFrame = targetPlayer.Character.HumanoidRootPart.CFrame
-        thrust.Location = targetPlayer.Character.HumanoidRootPart.Position
-        game:GetService("RunService").Heartbeat:Wait()
-
-        -- Stop if player starts moving quickly (arbitrary speed threshold)
-        if character.HumanoidRootPart.AssemblyLinearVelocity.Magnitude > 50 then
-            break
-        end
-    until tick() - startTime > 3  -- Stop after 3 seconds if no fling detected
-    
-    -- Cleanup
-    thrust:Destroy()
-
-    -- Restore collisions
-    restoreCollisions(character)
-    restoreCollisions(targetPlayer.Character)
+-- Rejoin command
+commands["rj"] = function()
+    game:GetService("TeleportService"):Teleport(game.PlaceId, botPlayer)
 end
+commands["rejoin"] = commands["rj"] -- Alias
 
--- Safe command implementation
-local function safeCommand()
-    local character = botPlayer.Character
-    if not character then return end
-    
-    -- Create a part in the sky (1 million studs high)
+-- Safe command
+commands["safe"] = function()
     local safePart = Instance.new("Part")
-    safePart.Size = Vector3.new(10, 10, 10)  -- You can adjust the size of the safe part
-    safePart.Position = Vector3.new(0, 1000000, 0)  -- Position it 1 million studs in the sky
+    safePart.Size = Vector3.new(10,1,10)
+    safePart.Position = botPlayer.Character.HumanoidRootPart.Position + Vector3.new(0,1000,0)
     safePart.Anchored = true
-    safePart.CanCollide = false
-    safePart.Parent = workspace
-
-    -- Move the client to the part, placing the bot on top of the part
-    character:SetPrimaryPartCFrame(CFrame.new(safePart.Position + Vector3.new(0, 5, 0)))  -- Position the player slightly above the part
-
-    -- Remove velocity from the client
-    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-    if humanoidRootPart then
-        humanoidRootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)  -- Remove velocity
-        humanoidRootPart.AssemblyAngularVelocity = Vector3.new(0, 0, 0)  -- Remove rotational velocity
-    end
-
-    print("Player is now safe and in the sky!")
+    safePart.Parent = game.Workspace
+    task.wait(0.5)
+    botPlayer.Character.HumanoidRootPart.CFrame = safePart.CFrame + Vector3.new(0,5,0)
+    botPlayer.Character.HumanoidRootPart.Velocity = Vector3.new(0,0,0)
 end
 
--- Whitelist command implementation
-local function whitelistCommand(playerName)
-    if playerName:lower() == Owner.Name:lower() then
-        print("You cannot whitelist the owner!")
-        return
-    end
-
-    local player = findPlayerByName(playerName)
-    if player then
-        whitelist[player.UserId] = player
-        print(player.Name .. " has been added to the whitelist.")
-    else
-        print("Player not found.")
+-- Whitelist commands
+commands["whitelist"] = function(args)
+    local target = Players:FindFirstChild(args[2])
+    if target then
+        whitelist[target.UserId] = true
+        print(target.Name .. " has been whitelisted.")
     end
 end
+commands["wl"] = commands["whitelist"]
 
--- Unwhitelist command implementation
-local function unwhitelistCommand(playerName)
-    if playerName:lower() == Owner.Name:lower() then
-        -- If someone tries to unwhitelist the owner, they get unwhitelisted instead
-        if whitelist[botPlayer.UserId] then
-            whitelist[botPlayer.UserId] = nil
-            print("You have been unwhitelisted for trying to unwhitelist the owner.")
-        end
-        return
-    end
-
-    local player = findPlayerByName(playerName)
-    if player then
-        whitelist[player.UserId] = nil
-        print(player.Name .. " has been removed from the whitelist.")
-    else
-        print("Player not found.")
+commands["unwhitelist"] = function(args)
+    local target = Players:FindFirstChild(args[2])
+    if target and target ~= Owner then
+        whitelist[target.UserId] = nil
+        print(target.Name .. " has been unwhitelisted.")
+    elseif target == Owner then
+        whitelist[botPlayer.UserId] = nil
+        print("You have unwhitelisted yourself.")
     end
 end
+commands["uwl"] = commands["unwhitelist"]
 
--- Spin command implementation
-local function spinCommand()
-    local character = botPlayer.Character
-    if character then
-        local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-        if humanoidRootPart then
-            local bodyGyro = Instance.new("BodyGyro")
-            bodyGyro.MaxTorque = Vector3.new(400000, 400000, 400000)
-            bodyGyro.CFrame = humanoidRootPart.CFrame
-            bodyGyro.Parent = humanoidRootPart
+-- Spin & Sit commands
+commands["spin"] = function()
+    botPlayer.Character.HumanoidRootPart.RotVelocity = Vector3.new(0,50,0)
+end
+commands["unspin"] = function()
+    botPlayer.Character.HumanoidRootPart.RotVelocity = Vector3.new(0,0,0)
+end
+commands["sit"] = function()
+    botPlayer.Character:FindFirstChildWhichIsA("Humanoid"):Sit(true)
+end
+commands["jump"] = function()
+    botPlayer.Character:FindFirstChildWhichIsA("Humanoid"):ChangeState(Enum.HumanoidStateType.Jumping)
+end
+commands["unsit"] = commands["jump"] -- Alias
 
-            -- Spin continuously
-            while true do
-                bodyGyro.CFrame = bodyGyro.CFrame * CFrame.Angles(0, math.rad(10), 0)
-                game:GetService("RunService").Heartbeat:Wait()
-            end
+-- Unsuspend VC
+commands["unsuspend"] = function()
+    VoiceChatService:JoinVoice()
+end
+commands["unsuspendvc"] = commands["unsuspend"] -- Alias
+
+-- Listen for chat commands
+game.Players.LocalPlayer.Chatted:Connect(function(message)
+    if message:sub(1, 1) == "." then
+        local parts = message:sub(2):split(" ")
+        local command = parts[1]
+        if commands[command] then
+            commands[command](parts)
+        else
+            print("Unknown command:", command)
         end
     end
-end
-
--- Unspin command implementation
-local function unspinCommand()
-    local character = botPlayer.Character
-    if character then
-        local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-        if humanoidRootPart then
-            local bodyGyro = humanoidRootPart:FindFirstChildOfClass("BodyGyro")
-            if bodyGyro then
-                bodyGyro:Destroy()
-            end
-        end
-    end
-end
-
--- Sit command implementation
-local function sitCommand()
-    local character = botPlayer.Character
-    if character then
-        local humanoid = character:FindFirstChildOfClass("Humanoid")
-        if humanoid then
-            humanoid.Sit = true
-        end
-    end
-end
-
--- Jump (unsit) command implementation
-local function jumpCommand()
-    local character = botPlayer.Character
-    if character then
-        local humanoid = character:FindFirstChildWhichIsA("Humanoid")
-        if humanoid then
-            humanoid.Sit = false
-            humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-            wait()
-            humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-        end
-    end
-end
-
-
--- Command listener
-for _, player in ipairs(Players:GetPlayers()) do
-    player.Chatted:Connect(function(message)
-        if message:sub(1, 1) == "." then
-            local parts = message:sub(2):split(" ")
-            local command = parts[1]
-
-            if player == Owner or whitelist[player.UserId] then
-                if command == "come" then
-                    -- Teleport bot to the owner
-                    botPlayer.Character:SetPrimaryPartCFrame(player.Character.PrimaryPart.CFrame)
-                elseif command == "reset" then
-                    -- Reset the bot player's character
-                    if botPlayer.Character then
-                        botPlayer.Character:BreakJoints()
-                    end
-                elseif command == "to" or command == "tp" then
-                    -- Teleport bot to another player
-                    local targetPlayerName = parts[2]
-                    local targetPlayer = findPlayerByName(targetPlayerName)
-                    if targetPlayer then
-                        botPlayer.Character:SetPrimaryPartCFrame(targetPlayer.Character.PrimaryPart.CFrame)
-                    else
-                        print("Player not found: " .. targetPlayerName)
-                    end
-                elseif command == "fling" then
-                    -- Fling the player to the target player
-                    local targetPlayerName = parts[2]
-                    local targetPlayer = findPlayerByName(targetPlayerName)
-                    if targetPlayer then
-                        flingPlayer(targetPlayer)
-                    else
-                        print("Player not found: " .. targetPlayerName)
-                    end
-                elseif command == "leave" or command == "dc" then
-                    -- Disconnect the bot from the game
-                    botPlayer:Kick("Disconnected by command.")  -- Optional message can be added
-                elseif command == "rj" or command == "rejoin" then
-                    -- Rejoin the game
-                    local placeId = game.PlaceId
-                    local teleportData = {}  -- Optional, can be used to send data on rejoin
-                    TeleportService:Teleport(placeId, botPlayer, teleportData)
-                elseif command == "safe" then
-                    -- Call the safe command
-                    safeCommand()
-                elseif command == "whitelist" or command == "wl" then
-                    -- Whitelist a player
-                    whitelistCommand(parts[2])
-                elseif command == "unwhitelist" or command == "uwl" then
-                    -- Unwhitelist a player
-                    unwhitelistCommand(parts[2])
-                elseif command == "spin" then
-                    -- Spin the player
-                    spinCommand()
-                elseif command == "unspin" then
-                    -- Stop the spinning
-                    unspinCommand()
-                elseif command == "sit" then
-                    -- Sit the player
-                    sitCommand()
-                elseif command == "jump" or command == "unsit" then
-                    -- Make the player jump (unsit)
-                    jumpCommand()
-                elseif command == "unsuspendvc" or command == "unsuspend" then
-                    VoiceChatService:joinVoice()
-                end 
-            else
-                print("You are not authorized to use this bot.")
-            end
-        end
-    end)
-end
-
-if Owner then
-    print("Welcome, " .. Owner.Name)
-    return Owner
-else
-    print("User not found, retrying!")
-    return nil
-end
+end)
