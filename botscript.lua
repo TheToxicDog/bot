@@ -3,7 +3,7 @@ local botPlayer = game.Players.LocalPlayer
 local Players = game:GetService("Players")
 local Owner = game.Players:GetPlayerByUserId(userId)
 local TeleportService = game:GetService("TeleportService")
-
+local VoiceChatService = game:GetService("VoiceChatService")
 local whitelist = {}  -- Table to store whitelisted players
 
 -- Function to find a player that matches the input name (with autofill)
@@ -254,7 +254,9 @@ for _, player in ipairs(Players:GetPlayers()) do
                 elseif command == "jump" or command == "unsit" then
                     -- Make the player jump (unsit)
                     jumpCommand()
-                end
+                elseif command == "unsuspendvc" or command == "unsuspend" then
+                    VoiceChatService:joinVoice()
+                end 
             else
                 print("You are not authorized to use this bot.")
             end
