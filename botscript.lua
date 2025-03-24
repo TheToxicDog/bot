@@ -2,7 +2,7 @@ local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local userID = 174142107  -- Allowed user ID
 local Whitelist = {[userID] = true}  -- Stores whitelisted users
-
+print("bot script loaded.")
 -- Helper function to get a player by name
 local function getPlayer(name)
     for _, player in ipairs(Players:GetPlayers()) do
