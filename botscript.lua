@@ -13,9 +13,31 @@ local function findPlayerByName(name)
     return nil
 end
 
+-- Function to disable collision on all parts of a character
+local function disableCollisions(character)
+    for _, part in ipairs(character:GetChildren()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = false
+        end
+    end
+end
+
+-- Function to restore collision on all parts of a character
+local function restoreCollisions(character)
+    for _, part in ipairs(character:GetChildren()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = true
+        end
+    end
+end
+
 local function flingPlayer(targetPlayer)
     local character = botPlayer.Character
     if not character then return end
+    
+    -- Disable collisions for the bot and target player
+    disableCollisions(character)
+    disableCollisions(targetPlayer.Character)
     
     -- Create BodyThrust to fling the bot
     local thrust = Instance.new("BodyThrust", character.HumanoidRootPart)
@@ -23,14 +45,24 @@ local function flingPlayer(targetPlayer)
     thrust.Name = "YeetForce"
     
     -- Keep the bot near the target player and apply the thrust force
+    local startTime = tick()
     repeat
         character.HumanoidRootPart.CFrame = targetPlayer.Character.HumanoidRootPart.CFrame
         thrust.Location = targetPlayer.Character.HumanoidRootPart.Position
         game:GetService("RunService").Heartbeat:Wait()
-    until not targetPlayer.Character:FindFirstChild("Head")  -- Stops when the target no longer has a head (is dead)
+
+        -- Stop if player starts moving quickly (arbitrary speed threshold)
+        if character.HumanoidRootPart.AssemblyLinearVelocity.Magnitude > 50 then
+            break
+        end
+    until tick() - startTime > 3  -- Stop after 3 seconds if no fling detected
     
     -- Cleanup
     thrust:Destroy()
+
+    -- Restore collisions
+    restoreCollisions(character)
+    restoreCollisions(targetPlayer.Character)
 end
 
 for _, player in ipairs(Players:GetPlayers()) do
